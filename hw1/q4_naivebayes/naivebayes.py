@@ -99,6 +99,7 @@ def predict(words, label_counts, word_counts, vocabulary):
     # Calculate log of pi:
     log_pi = np.log(label_counts_numpy) - np.log(np.sum(label_counts_numpy))
 
+
     # Calculate each label's word count in vocabulary
     label_word_count = defaultdict()
     for label in labels:
@@ -182,7 +183,7 @@ def analyze_counts(label_counts, word_counts, vocabulary):
     labels = list(label_counts.keys())  # A list of all the labels
     p_label_given_word = defaultdict(list)
     ### BEGIN_SOLUTION 4b
-    lamda = 1
+    lamda = 0
 
 
     label_word_count = []

@@ -23,7 +23,11 @@ def featurize(x, d=1):
         return [1, x]
     else:
         ### BEGIN_SOLUTION 3c
-        raise NotImplementedError
+        feature_vector = []
+        for i in range(d+1):
+            feature_vector.append(x ** i)
+        return feature_vector
+
         ### END_SOLUTION 3c
 
 def predict(w, X):
@@ -36,7 +40,8 @@ def predict(w, X):
         - Predictions vector y_pred of size (D,)
     """
     ### BEGIN_SOLUTION 3a
-    raise NotImplementedError
+    w_transposed = w.transpose()  # Just doing this for the sake of formality
+    return np.dot(w, X.transpose())  # Taking dot product of the two.
     ### END_SOLUTION 3a
 
 def train_gradient_descent(X_train, y_train, lr=1e-2, num_iters=400):
@@ -52,7 +57,27 @@ def train_gradient_descent(X_train, y_train, lr=1e-2, num_iters=400):
     """
     N, D = X_train.shape
     ### BEGIN_SOLUTION 3a
-    raise NotImplementedError
+    w = np.zeros(D)  # Initial values of parameters
+    for t in range(num_iters):
+        # print(X_train.shape)
+        # print(w.shape)
+        # print("buruh")
+        # print(y_train.shape)
+        # print((np.dot(w, X_train.transpose())).shape)
+        w_X = np.dot(w, X_train.transpose())
+        # print(w_X.shape)
+        scalar = np.subtract(w_X, y_train)
+        # print("scalar.shape = " + str(scalar.shape))
+        # print("X_train.shape = " + str(X_train.shape))
+        within_sum = np.dot(scalar, X_train)
+        # print(within_sum.shape)
+        # print(np.full(N, 2).shape)
+        delta_loss = (2 / N) * within_sum
+        # sum_over_N = np.sum(np.dot(np.full(N, 2), within_sum))
+        # print(sum_over_N.shape)
+        # delta_loss = np.dot(np.full(N, (1 / N)), sum_over_N)
+        w = np.subtract(w, np.dot(lr, delta_loss))
+
     ### END_SOLUTION 3a
     return w
 
@@ -66,7 +91,11 @@ def train_normal_equations(X_train, y_train):
         - Weight vector w of size (D,)
     """
     ### BEGIN_SOLUTION 3b
-    raise NotImplementedError
+    X_trans_dot_X = np.dot(X_train.transpose(), X_train)
+    X_trans_dot_X_inverse = pinv(X_trans_dot_X)
+    X_trans_dot_X_inverse_dot_X_inverse = np.dot(X_trans_dot_X_inverse, X_train.transpose())
+    w = np.dot(X_trans_dot_X_inverse_dot_X_inverse, y_train)
+    return w
     ### END_SOLUTION 3b
 
 def plot_sweep(degrees, train_rmses, dev_rmses):
@@ -114,6 +143,9 @@ def parse_args():
         parser.print_help()
         sys.exit(1)
     return parser.parse_args()
+
+
+# def gradient_f()
 
 def main():
     train_rmses = []
