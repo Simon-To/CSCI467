@@ -1,0 +1,8 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+imageio
+matplotlib
+numpy
+tqdm
+torch==1.13.1
+torchaudio
+torchvision
