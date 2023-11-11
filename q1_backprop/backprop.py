@@ -180,8 +180,8 @@ class SigmoidNode(Node):
     def backward(self):
         ### BEGIN_SOLUTION 1e
         # TODO: (DONE)
-        u = sigmoid(self.n.value)
-        self.n.grad += self.grad * (u * (np.float64(1) - u))
+        # u = sigmoid(self.n.value)
+        self.n.grad += self.grad * (self.value * (np.float64(1) - self.value))
         ### END_SOLUTION 1e
 
 class DotNode(Node):
@@ -225,12 +225,19 @@ class MVMulNode(Node):
         self.topo_order.append(self)
         # TODO: Set self.value (forward pass) and initialize self.grad
         ### BEGIN_SOLUTION 1k
-        raise NotImplementedError
+        # Set self.value (forward pass)
+        self.value = np.dot(M.value, v.value)
+        # Initialize self.grad
+        self.grad = np.zeros(p, dtype=np.float64)
         ### END_SOLUTION 1k
 
     def backward(self):
         ### BEGIN_SOLUTION 1k
-        raise NotImplementedError
+        p, d = self.M.value.shape
+        flattened_g = self.grad.reshape(p, 1)
+        flattened_v = self.v.value.reshape(1, d)
+        self.M.grad += np.dot(flattened_g, flattened_v)
+        self.v.grad += np.matmul(self.M.value.T, self.grad)
         ### END_SOLUTION 1k
 
 def gradient_check_1(a_test, b_test, c_test):
@@ -298,23 +305,35 @@ def gradient_check_1(a_test, b_test, c_test):
     # (a_a, b_a, c_a), out_a = compute_f((a_test + np.float64(EPSILON)), b_test, c_test)
     # (a_b, b_b, c_b), out_b = compute_f(a_test, (b_test + np.float64(EPSILON)), c_test)
     # (a_c, b_c, c_c), out_c = compute_f(a_test, b_test, (c_test + np.float64(EPSILON)))
-    (a_a, b_a, c_a), out_a = compute_f(np.float64(a_test + EPSILON), b_test, c_test)
-    out_a.compute_grad()
-    (a_b, b_b, c_b), out_b = compute_f(a_test, np.float64(b_test + EPSILON), c_test)
-    out_b.compute_grad()
-    (a_c, b_c, c_c), out_c = compute_f(a_test, b_test, np.float64(c_test + EPSILON))
-    out_c.compute_grad()
+    change_a_0 = compute_f(a_test + np.array([EPSILON, 0]), b_test, c_test)[1].value - orig
+    change_a_1 = compute_f(a_test + np.array([0, EPSILON]), b_test, c_test)[1].value - orig
+    change_b_0 = compute_f(a_test, b_test + np.array([EPSILON, 0]), c_test)[1].value - orig
+    change_b_1 = compute_f(a_test, b_test + np.array([0, EPSILON]), c_test)[1].value - orig
+    change_c_0 = compute_f(a_test, b_test, c_test + np.array([EPSILON, 0]))[1].value - orig
+    change_c_1 = compute_f(a_test, b_test, c_test + np.array([0, EPSILON]))[1].value - orig
+    # (a_a, b_a, c_a), out_a = compute_f(np.float64(a_test + EPSILON), b_test, c_test)
+    # out_a.compute_grad()
+    # (a_b, b_b, c_b), out_b = compute_f(a_test, np.float64(b_test + EPSILON), c_test)
+    # out_b.compute_grad()
+    # (a_c, b_c, c_c), out_c = compute_f(a_test, b_test, np.float64(c_test + EPSILON))
+    # out_c.compute_grad()
     # change_a = a_a.grad - a.grad
     # change_b = b_b.grad - b.grad
     # change_c = c_c.grad - c.grad
-    change_a = out_a.value - orig
-    change_b = out_b.value - orig
-    change_c = out_c.value - orig
+    # change_a = out_a.value - orig
+    # change_b = out_b.value - orig
+    # change_c = out_c.value - orig
 
     # Derivative is (change in output) / (change in input)
-    a_grad_numerical = a_a.grad
-    b_grad_numerical = b_b.grad
-    c_grad_numerical = c_c.grad
+    a_grad_numerical[0] = change_a_0 / np.array([EPSILON])
+    a_grad_numerical[1] = change_a_1 / np.array([EPSILON])
+    b_grad_numerical[0] = change_b_0 / np.array([EPSILON])
+    b_grad_numerical[1] = change_b_1 / np.array([EPSILON])
+    c_grad_numerical[0] = change_c_0 / np.array([EPSILON])
+    c_grad_numerical[1] = change_c_1 / np.array([EPSILON])
+    # a_grad_numerical = a_a.grad
+    # b_grad_numerical = b_b.grad
+    # c_grad_numerical = c_c.grad
     # a_grad_numerical = change_a
     # b_grad_numerical = change_b
     # c_grad_numerical = change_c
@@ -358,34 +377,30 @@ def make_logistic_regression(dataset):
         # TODO: Set total_loss to be a Node whose value is the logistic regression loss
         total_loss = None
         ### BEGIN_SOLUTION 1i
+
+        input_nodes = []  # Array of input nodes base on every data in dataset
+
         first_iteration = True
         for data in dataset:
-            x = data[0]                 # a numpy array of length 2
-            y = np.float64(data[1])     # either -1 or 1, converting to numpy float 64
+            # Each InputNode will have a value of a numpy array of length 2
+            input_nodes.append(InputNode(data[0], topo_order))
 
-            # Initialize the Input Nodes:
-            x_node = InputNode(x, topo_order)
-            y_node = InputNode(y, topo_order)
-
-            w_dot_x = DotNode(w, x_node)
+        for index in range(len(dataset)):
+            w_dot_x = DotNode(w, input_nodes[index])
 
             w_dot_x_add_b = AddNode(w_dot_x, b)
 
-            y_times_w_dot_x_add_b = MulNode(y_node, w_dot_x_add_b)
+            current_loss = ConstantMulNode(w_dot_x_add_b, dataset[index][1])
+            logsig_current_loss = LogNode(SigmoidNode(current_loss))
 
-            sigmoided = SigmoidNode(y_times_w_dot_x_add_b)
-
-            log_sigmoided = LogNode(sigmoided)
-
-            example_output = ConstantMulNode(log_sigmoided, np.float64(-1))
 
             if first_iteration:
                 # The example-specific output node will simply be assigned to the total_loss node:
-                total_loss = example_output
+                total_loss = ConstantMulNode(logsig_current_loss, -1)
                 first_iteration = False
             else:
                 # The example-specific output node will have to be added to the cumulative tally of total_loss node:
-                total_loss = AddNode(total_loss, example_output)
+                total_loss = AddNode(total_loss, ConstantMulNode(logsig_current_loss, -1))
 
         ### END_SOLUTION 1i
         return (w, b), total_loss
@@ -412,8 +427,13 @@ def gradient_descent(f, params, lr, num_iters):
 
         # TODO: Update each parameter in params via gradient descent
         ### BEGIN_SOLUTION 1i
-        raise NotImplementedError
+
+        loss.compute_grad()
+        for index in range(len(params)):
+            params[index] -= lr * input_nodes[index].grad
+            # params[index] = param - lr * loss.grad
         ### END_SOLUTION 1i
+
     print(f'Final loss={loss.value}')
 
 def gradient_check_2(M_test, v_test):
@@ -439,7 +459,9 @@ def gradient_check_2(M_test, v_test):
         # Now, create the computation graph that computes f
         output_node = None  # TODO: Set this so we can return it
         ### BEGIN_SOLUTION 1m
-        raise NotImplementedError
+        M_dot_v = MVMulNode(M, v)
+        relu_M_dot_v = ReluNode(M_dot_v)
+        output_node = DotNode(v, relu_M_dot_v)
         ### END_SOLUTION 1m
         return input_nodes, output_node
 
@@ -454,7 +476,20 @@ def gradient_check_2(M_test, v_test):
     M_grad_numerical = np.zeros((2, 2))  # Numerically computed gradient with respect to M
     v_grad_numerical = np.zeros(2)  # Numerically computed gradient with respect to v
     ### BEGIN_SOLUTION 1m
-    raise NotImplementedError
+    orig = out.value
+    change_M_0_0 = compute_f(M_test + np.array([[EPSILON, 0], [0, 0]]), v_test)[1].value - orig
+    change_M_0_1 = compute_f(M_test + np.array([[0, EPSILON], [0, 0]]), v_test)[1].value - orig
+    change_M_1_0 = compute_f(M_test + np.array([[0, 0], [EPSILON, 0]]), v_test)[1].value - orig
+    change_M_1_1 = compute_f(M_test + np.array([[0, 0], [0, EPSILON]]), v_test)[1].value - orig
+    change_v_0 = compute_f(M_test, v_test + np.array([EPSILON, 0]))[1].value - orig
+    change_v_1 = compute_f(M_test, v_test + np.array([0, EPSILON]))[1].value - orig
+
+    M_grad_numerical[0][0] = change_M_0_0 / np.array([EPSILON])
+    M_grad_numerical[0][1] = change_M_0_1 / np.array([EPSILON])
+    M_grad_numerical[1][0] = change_M_1_0 / np.array([EPSILON])
+    M_grad_numerical[1][1] = change_M_1_1 / np.array([EPSILON])
+    v_grad_numerical[0] = change_v_0 / np.array([EPSILON])
+    v_grad_numerical[1] = change_v_1 / np.array([EPSILON])
     ### END_SOLUTION 1m
 
     # Finally, this code checks the difference between the gradients computed by backprop
@@ -479,7 +514,31 @@ def make_neural_network(dataset):
         # TODO: Set total_loss to be a Node whose value is the loss for the neural network
         total_loss = None
         ### BEGIN_SOLUTION 1n
-        raise NotImplementedError
+
+        input_nodes = []  # Array of input nodes base on every data in dataset
+
+        first_iteration = True
+        for data in dataset:
+            # Each InputNode will have a value of a numpy array of length 2
+            input_nodes.append(InputNode(data[0], topo_order))
+
+        for index in range(len(dataset)):
+            w_dot_x = MVMulNode(W, input_nodes[index])
+            w_dot_x_add_b = AddNode(w_dot_x, b)
+            relu_w_dot_x_add_b = ReluNode(w_dot_x_add_b)
+            v_dot_relu_w_dot_x_add_b = DotNode(v, relu_w_dot_x_add_b)
+            v_dot_relu_w_dot_x_add_b_add_c = AddNode(v_dot_relu_w_dot_x_add_b, c)
+            current_loss = ConstantMulNode(v_dot_relu_w_dot_x_add_b_add_c, dataset[index][1])
+            logsig_current_loss = LogNode(SigmoidNode(current_loss))
+
+            if first_iteration:
+                # The example-specific output node will simply be assigned to the total_loss node:
+                total_loss = ConstantMulNode(logsig_current_loss, -1)
+                first_iteration = False
+            else:
+                # The example-specific output node will have to be added to the cumulative tally of total_loss node:
+                total_loss = AddNode(total_loss, ConstantMulNode(logsig_current_loss, -1))
+
         ### END_SOLUTION 1n
         return (W, b, v, c), total_loss
 

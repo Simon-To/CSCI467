@@ -29,7 +29,32 @@ def kmeans(X, k):
     centroids = X[np.random.choice(np.arange(N), k, replace=False),:]  # k x D matrix
 
     ### BEGIN_SOLUTION 2a
-    raise NotImplementedError
+
+    # Original z backup for cross comparison:
+    z_original = np.copy(z)
+
+    while True:
+        # Step 1: Calculate new z:
+        distance = X[:, np.newaxis] - centroids
+        L2 = np.square(np.linalg.norm(distance, axis=-1))
+        z = np.argmin(L2, axis=-1)
+
+        # Step 2: Calculate new centroids:
+        for index in range(k):
+            # Based on the cluster that we assigned just now.
+            population = np.count_nonzero(z == index)
+            centroids[index] = np.sum(X[(z == index), :], axis=0) / population
+
+        # Step 3: Exit infinite loop upon convergence of z:
+        z_converged = np.all(z == z_original)
+        if z_converged:
+            break
+        else:
+            z_original = z
+
+    # Step 4: Calculate Total loss:
+    loss = np.sum(np.square(np.linalg.norm(X - centroids[z, :], axis=1)))
+
     ### END_SOLUTION 2a
     return (z, centroids, loss)
 
